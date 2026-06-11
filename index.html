@@ -1,0 +1,810 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Salla Stock Import</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap');
+
+  :root {
+    --teal:       #00A6A6;
+    --teal-dark:  #007f7f;
+    --teal-light: #e6f7f7;
+    --teal-mid:   #b3e6e6;
+    --bg:         #f4fafa;
+    --surface:    #ffffff;
+    --border:     #d0eaea;
+    --text:       #1a2e2e;
+    --muted:      #4a6e6e;
+    --error:      #c0392b;
+    --success:    #1a7a4a;
+    --warn:       #d68910;
+    --radius:     10px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'IBM Plex Sans Arabic', 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 24px 16px 48px;
+  }
+
+  .page-header {
+    max-width: 820px;
+    margin: 0 auto 28px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .logo-icon {
+    width: 48px; height: 48px;
+    background: var(--teal);
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .logo-icon svg { width: 28px; height: 28px; fill: white; }
+  .page-header h1 {
+    font-size: 1.6rem; font-weight: 700;
+    color: var(--teal-dark);
+    line-height: 1.2;
+  }
+  .page-header p {
+    font-size: 0.88rem; color: var(--muted);
+    margin-top: 3px;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+    max-width: 820px;
+    margin: 0 auto 20px;
+    box-shadow: 0 2px 8px rgba(0,166,166,0.06);
+  }
+
+  .card-title {
+    font-size: 1rem; font-weight: 600;
+    color: var(--teal-dark);
+    margin-bottom: 18px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid var(--teal-light);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .card-title svg { width: 18px; height: 18px; flex-shrink: 0; }
+
+  .drop-zone {
+    border: 2px dashed var(--teal-mid);
+    border-radius: var(--radius);
+    padding: 28px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.18s ease;
+    background: var(--teal-light);
+    position: relative;
+    margin-bottom: 10px;
+  }
+  .drop-zone:hover, .drop-zone.drag-over {
+    border-color: var(--teal);
+    background: #d0f0f0;
+  }
+  .drop-zone input[type="file"] {
+    position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+  }
+  .drop-zone .dz-icon { font-size: 2rem; margin-bottom: 6px; }
+  .drop-zone .dz-label {
+    font-size: 0.95rem; font-weight: 600; color: var(--teal-dark);
+  }
+  .drop-zone .dz-hint {
+    font-size: 0.8rem; color: var(--muted); margin-top: 4px;
+  }
+  .drop-zone.has-file { border-style: solid; border-color: var(--teal); background: #c8edee; }
+  .drop-zone.has-file .dz-label { color: var(--success); }
+
+  .files-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  @media (max-width: 560px) { .files-grid { grid-template-columns: 1fr; } }
+
+  .file-label {
+    font-size: 0.82rem; font-weight: 600; color: var(--muted);
+    margin-bottom: 6px; display: block;
+  }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 11px 28px;
+    border-radius: 8px; border: none; cursor: pointer;
+    font-family: inherit; font-size: 1rem; font-weight: 600;
+    transition: all 0.15s;
+  }
+  .btn-primary {
+    background: var(--teal); color: white;
+    box-shadow: 0 3px 10px rgba(0,166,166,0.3);
+  }
+  .btn-primary:hover:not(:disabled) { background: var(--teal-dark); transform: translateY(-1px); }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+  .btn-success {
+    background: var(--success); color: white;
+    box-shadow: 0 3px 10px rgba(26,122,74,0.25);
+  }
+  .btn-success:hover { background: #155a38; }
+
+  .btn-secondary {
+    background: var(--teal-light); color: var(--teal-dark);
+    border: 1.5px solid var(--teal-mid);
+  }
+  .btn-secondary:hover { background: var(--teal-mid); }
+
+  .actions-row {
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    margin-top: 4px;
+  }
+
+  /* Log */
+  .log-box {
+    background: #0d2020;
+    border-radius: 8px;
+    padding: 14px 16px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.82rem;
+    color: #7effd8;
+    min-height: 90px;
+    max-height: 200px;
+    overflow-y: auto;
+    line-height: 1.65;
+    direction: ltr;
+    text-align: left;
+  }
+  .log-box .log-err { color: #ff7e7e; }
+  .log-box .log-ok  { color: #80ffb0; }
+  .log-box .log-info { color: #7effd8; }
+
+  /* Progress */
+  .progress-wrap {
+    background: var(--teal-light); border-radius: 999px;
+    height: 8px; overflow: hidden; flex: 1; min-width: 120px;
+  }
+  .progress-bar {
+    height: 100%; background: var(--teal);
+    border-radius: 999px;
+    width: 0%;
+    transition: width 0.3s;
+  }
+  .progress-bar.indeterminate {
+    width: 40%;
+    animation: slide 1.1s linear infinite;
+  }
+  @keyframes slide {
+    0% { margin-right: 100%; margin-left: -40%; }
+    100% { margin-right: -40%; margin-left: 100%; }
+  }
+
+  /* Summary cards */
+  .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .stat-card {
+    background: var(--teal-light);
+    border: 1px solid var(--teal-mid);
+    border-radius: 8px;
+    padding: 14px 16px;
+    text-align: center;
+  }
+  .stat-card .stat-val {
+    font-size: 1.7rem; font-weight: 700; color: var(--teal-dark);
+    display: block; line-height: 1.1;
+  }
+  .stat-card .stat-lbl {
+    font-size: 0.78rem; color: var(--muted); margin-top: 4px;
+  }
+
+  /* Tables */
+  .table-wrap {
+    overflow-x: auto;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    margin-top: 10px;
+  }
+  table {
+    width: 100%; border-collapse: collapse;
+    font-size: 0.84rem;
+  }
+  th {
+    background: var(--teal); color: white;
+    padding: 9px 12px; text-align: center;
+    font-weight: 600; white-space: nowrap;
+  }
+  td {
+    padding: 8px 12px; border-bottom: 1px solid var(--border);
+    text-align: center; color: var(--text);
+  }
+  tr:last-child td { border-bottom: none; }
+  tr:nth-child(even) td { background: var(--teal-light); }
+
+  /* Tabs */
+  .tabs { display: flex; gap: 4px; margin-bottom: 14px; flex-wrap: wrap; }
+  .tab-btn {
+    padding: 7px 16px; border-radius: 7px;
+    border: 1.5px solid var(--border);
+    background: var(--surface); cursor: pointer;
+    font-family: inherit; font-size: 0.85rem; font-weight: 500;
+    color: var(--muted); transition: all 0.13s;
+  }
+  .tab-btn:hover { border-color: var(--teal); color: var(--teal-dark); }
+  .tab-btn.active {
+    background: var(--teal); color: white; border-color: var(--teal);
+    font-weight: 600;
+  }
+  .tab-pane { display: none; }
+  .tab-pane.active { display: block; }
+
+  .empty-state {
+    text-align: center; padding: 28px 16px;
+    color: var(--muted); font-size: 0.9rem;
+  }
+  .empty-state span { font-size: 2rem; display: block; margin-bottom: 6px; }
+
+  #results-card { display: none; }
+
+  .badge {
+    display: inline-block;
+    padding: 2px 9px; border-radius: 999px;
+    font-size: 0.76rem; font-weight: 600;
+  }
+  .badge-warn { background: #fef3cd; color: #8a6200; }
+  .badge-ok   { background: #d4edda; color: #1a5c2e; }
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <div class="logo-icon">
+    <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14l4-2 4 2 4-2 4 2V5c0-1.1-.9-2-2-2zm-5 10H8v-2h6v2zm2-4H8V7h8v2z"/></svg>
+  </div>
+  <div>
+    <h1>Salla Stock Import</h1>
+    <p>حوّل بيانات المخزون إلى قالب استيراد سلة — مباشرةً في المتصفح</p>
+  </div>
+</div>
+
+<!-- File Upload Card -->
+<div class="card">
+  <div class="card-title">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 16v4h16v-4M12 4v12M8 8l4-4 4 4"/></svg>
+    رفع الملفات
+  </div>
+
+  <div class="files-grid">
+    <div>
+      <span class="file-label">📦 ملف المخزون (Stock)</span>
+      <div class="drop-zone" id="dz-stock">
+        <input type="file" accept=".xlsx,.xls" id="inp-stock">
+        <div class="dz-icon">📊</div>
+        <div class="dz-label">اسحب الملف هنا أو انقر للاختيار</div>
+        <div class="dz-hint">يحتاج أعمدة: ProductId، Packs</div>
+      </div>
+    </div>
+    <div>
+      <span class="file-label">🛒 ملف منتجات سلة (Salla Products)</span>
+      <div class="drop-zone" id="dz-salla">
+        <input type="file" accept=".xlsx,.xls" id="inp-salla">
+        <div class="dz-icon">🏪</div>
+        <div class="dz-label">اسحب الملف هنا أو انقر للاختيار</div>
+        <div class="dz-hint">يحتاج أعمدة: No.، النوع، أسم المنتج، رمز المنتج sku</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="actions-row" style="margin-top:20px">
+    <button class="btn btn-primary" id="btn-generate" disabled>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><polyline points="5 12 12 5 19 12"/><path d="M12 19V5"/></svg>
+      توليد الملف
+    </button>
+    <div class="progress-wrap" id="prog-wrap" style="display:none">
+      <div class="progress-bar indeterminate" id="prog-bar"></div>
+    </div>
+    <button class="btn btn-secondary" id="btn-reset" style="display:none">إعادة تعيين</button>
+  </div>
+
+  <div style="margin-top:14px">
+    <div class="log-box" id="log-box"><span class="log-info">// جاهز. ارفع الملفين لتبدأ.</span></div>
+  </div>
+</div>
+
+<!-- Results Card -->
+<div class="card" id="results-card">
+  <div class="card-title">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="16 12 12 8 8 12"/><line x1="12" y1="16" x2="12" y2="8"/></svg>
+    النتائج
+  </div>
+
+  <!-- Stats -->
+  <div class="summary-grid" id="summary-grid"></div>
+
+  <!-- Download buttons -->
+  <div class="actions-row" style="margin-bottom:20px">
+    <button class="btn btn-success" id="btn-dl-output">
+      ⬇️ تحميل ملف الاستيراد (Salla_Stock_Import_Output.xlsx)
+    </button>
+    <button class="btn btn-secondary" id="btn-dl-report">
+      📋 تحميل تقرير التدقيق (Report.xlsx)
+    </button>
+  </div>
+
+  <!-- Tabs for detailed reports -->
+  <div class="tabs" id="report-tabs"></div>
+  <div id="report-panes"></div>
+</div>
+
+<script>
+// ==========================================
+// Constants & Aliases  (mirror of Python)
+// ==========================================
+const COLUMN_ALIASES = {
+  "ProductId": ["ProductId","ProductID","Product Id","Product ID","Item No.","Item No","Item Code","ItemCode","Item","SKU","Sku","sku"],
+  "Packs": ["Packs","Pack","Qty Packs","Pack Qty","Stock Packs"],
+  "No.": ["No.","No","رقم","الرقم"],
+  "النوع": ["النوع","نوع","Type","type"],
+  "أسم المنتج": ["أسم المنتج","اسم المنتج","إسم المنتج","Product Name","Product","Name"],
+  "رمز المنتج sku": ["رمز المنتج sku","رمز المنتج SKU","رمز المنتج Sku","SKU","Sku","sku","Product SKU","ProductSku"],
+};
+const STOCK_REQUIRED = ["ProductId","Packs"];
+const SALLA_REQUIRED = ["No.","النوع","أسم المنتج","رمز المنتج sku"];
+const OUTPUT_COLUMNS = ["No.","النوع","أسم المنتج","رمز المنتج sku","غير محدود الكمية","الكمية"];
+
+// ==========================================
+// Header helpers
+// ==========================================
+function cleanHeader(v) {
+  if (v == null) return "";
+  return String(v).trim().replace(/\u00a0/g," ").replace(/\s+/g," ").trim();
+}
+function fingerprint(v) {
+  let t = cleanHeader(v).toLowerCase()
+    .replace(/أ/g,"ا").replace(/إ/g,"ا").replace(/آ/g,"ا")
+    .replace(/ى/g,"ي").replace(/ة/g,"ه");
+  return t.replace(/[^0-9a-zA-Z\u0600-\u06FF]+/g,"");
+}
+function buildAliasLookup() {
+  const map = {};
+  for (const [canon, aliases] of Object.entries(COLUMN_ALIASES)) {
+    for (const a of [...aliases, canon]) {
+      const fp = fingerprint(a);
+      if (fp) map[fp] = canon;
+    }
+  }
+  return map;
+}
+const ALIAS_MAP = buildAliasLookup();
+
+function detectHeaderRow(rows) {
+  let best = 0, bestScore = -1;
+  const scan = Math.min(rows.length, 20);
+  for (let i = 0; i < scan; i++) {
+    const fps = rows[i].map(v => fingerprint(cleanHeader(v))).filter(Boolean);
+    let score = fps.filter(fp => ALIAS_MAP[fp]).length;
+    const joined = fps.join("|");
+    if (joined.includes(fingerprint("رمز المنتج sku"))) score += 3;
+    if (joined.includes(fingerprint("Item No.")) || joined.includes(fingerprint("ProductId"))) score += 3;
+    if (joined.includes(fingerprint("Packs"))) score += 3;
+    if (score > bestScore) { bestScore = score; best = i; }
+  }
+  return best;
+}
+
+function applyAliases(headers) {
+  const used = new Set();
+  return headers.map(h => {
+    const clean = cleanHeader(h);
+    let canon = ALIAS_MAP[fingerprint(clean)] || clean;
+    if (used.has(canon)) {
+      let n = 2;
+      while (used.has(`${canon}__${n}`)) n++;
+      canon = `${canon}__${n}`;
+    }
+    used.add(canon);
+    return canon;
+  });
+}
+
+function parseExcel(arrayBuffer) {
+  const wb = XLSX.read(arrayBuffer, { type:"array", raw:false, cellText:true });
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const raw = XLSX.utils.sheet_to_json(ws, { header:1, defval:"", raw:false });
+  if (!raw.length) return [];
+
+  const headerRow = detectHeaderRow(raw);
+  const rawHeaders = raw[headerRow].map(v => cleanHeader(v));
+  const headers = applyAliases(rawHeaders.map((h,i) => h || `Unnamed: ${i}`));
+
+  const rows = [];
+  for (let i = headerRow + 1; i < raw.length; i++) {
+    const r = raw[i];
+    // Skip fully empty rows
+    if (r.every(v => v == null || String(v).trim() === "")) continue;
+    const obj = {};
+    headers.forEach((h, j) => { obj[h] = r[j] != null ? String(r[j]).trim() : ""; });
+    rows.push(obj);
+  }
+  return rows;
+}
+
+// ==========================================
+// Core processing
+// ==========================================
+function normalizeKey(v) {
+  if (!v || String(v).toLowerCase() in {nan:1,none:1,null:1,nat:1}) return "";
+  let t = String(v).trim().replace(/\u00a0/g," ").replace(/\s+/g,"");
+  if (/^\d+\.0$/.test(t)) t = t.slice(0, -2);
+  return t;
+}
+
+function validateColumns(rows, required, label) {
+  if (!rows.length) throw new Error(`الملف ${label} فارغ.`);
+  const cols = Object.keys(rows[0]);
+  const missing = required.filter(r => !cols.includes(r));
+  if (missing.length) {
+    throw new Error(`أعمدة مفقودة في ${label}: ${missing.join(", ")}\nالأعمدة المتاحة: ${cols.join(", ")}`);
+  }
+}
+
+function aggregateStock(rows) {
+  const map = {};
+  for (const r of rows) {
+    const key = normalizeKey(r["ProductId"]);
+    if (!key) continue;
+    const qty = parseFloat(r["Packs"]) || 0;
+    map[key] = (map[key] || 0) + qty;
+  }
+  return map; // { normalizedSKU -> totalPacks }
+}
+
+function buildOutput(sallaRows, stockMap) {
+  const output = [];
+  let matched = 0, notMatched = 0;
+  const notMatchedRows = [];
+  const stockUsed = new Set();
+
+  const skuKeySeen = {};
+  const duplicateSallaSKUs = {};
+
+  for (const r of sallaRows) {
+    const skuKey = normalizeKey(r["رمز المنتج sku"]);
+    if (skuKey) {
+      skuKeySeen[skuKey] = (skuKeySeen[skuKey] || 0) + 1;
+    }
+  }
+
+  for (const r of sallaRows) {
+    const skuKey = normalizeKey(r["رمز المنتج sku"]);
+    const qty = skuKey && stockMap[skuKey] !== undefined ? stockMap[skuKey] : 0;
+    if (skuKey) {
+      if (stockMap[skuKey] !== undefined) {
+        matched++;
+        stockUsed.add(skuKey);
+      } else {
+        notMatched++;
+        notMatchedRows.push(r);
+      }
+      if (skuKeySeen[skuKey] > 1) duplicateSallaSKUs[skuKey] = true;
+    }
+    const qtyVal = Number.isInteger(qty) ? qty : (qty % 1 === 0 ? parseInt(qty) : qty);
+    output.push({
+      "No.": r["No."] || "",
+      "النوع": r["النوع"] || "",
+      "أسم المنتج": r["أسم المنتج"] || "",
+      "رمز المنتج sku": r["رمز المنتج sku"] || "",
+      "غير محدود الكمية": "لا",
+      "الكمية": qtyVal,
+    });
+  }
+
+  const stockNotFound = Object.entries(stockMap)
+    .filter(([k]) => !stockUsed.has(k))
+    .map(([k, v]) => ({ "ProductId": k, "Total Packs": v }));
+
+  const dupRows = sallaRows
+    .filter(r => duplicateSallaSKUs[normalizeKey(r["رمز المنتج sku"])])
+    .map(r => ({
+      "No.": r["No."] || "",
+      "النوع": r["النوع"] || "",
+      "أسم المنتج": r["أسم المنتج"] || "",
+      "رمز المنتج sku": r["رمز المنتج sku"] || "",
+      "Normalized SKU": normalizeKey(r["رمز المنتج sku"]),
+    }));
+
+  const totalQty = output.reduce((s, r) => s + (parseFloat(r["الكمية"]) || 0), 0);
+
+  return {
+    output,
+    reports: {
+      "Not Matched In Stock": notMatchedRows,
+      "Stock Not Found In Salla": stockNotFound,
+      "Duplicate Salla SKUs": dupRows,
+      "Stock Aggregation": Object.entries(stockMap).map(([k,v])=>({ "ProductId": k, "Total Packs": v })),
+    },
+    summary: {
+      "إجمالي منتجات سلة": sallaRows.length,
+      "منتجات تطابقت": matched,
+      "منتجات لم تتطابق": notMatched,
+      "إجمالي الكمية المُصدَّرة": totalQty,
+      "ProductIds غير موجودة في سلة": stockNotFound.length,
+    }
+  };
+}
+
+// ==========================================
+// Excel writing with XLSX.js
+// ==========================================
+function writeOutputXLSX(outputRows) {
+  const wb = XLSX.utils.book_new();
+
+  // Group header row
+  const groupRow = ["بيانات المنتج","","","","الكميات",""];
+  const headerRow = OUTPUT_COLUMNS;
+  const dataRows = outputRows.map(r => OUTPUT_COLUMNS.map(c => r[c]));
+
+  const wsData = [groupRow, headerRow, ...dataRows];
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+  // Merge group cells
+  ws["!merges"] = [
+    { s:{r:0,c:0}, e:{r:0,c:3} },
+    { s:{r:0,c:4}, e:{r:0,c:5} },
+  ];
+
+  // Column widths
+  ws["!cols"] = [
+    {wch:8},{wch:14},{wch:38},{wch:20},{wch:16},{wch:12}
+  ];
+
+  // Style cells via !cellStyles (xlsx doesn't support full styling in free build)
+  // We'll apply number format @ to SKU column
+  for (let i = 2; i < wsData.length; i++) {
+    const cellRef = XLSX.utils.encode_cell({r:i, c:3});
+    if (!ws[cellRef]) ws[cellRef] = { v: String(outputRows[i-2]["رمز المنتج sku"] || ""), t:"s" };
+    ws[cellRef].t = "s";
+    ws[cellRef].v = String(ws[cellRef].v || "");
+    ws[cellRef].z = "@";
+  }
+
+  XLSX.utils.book_append_sheet(wb, ws, "Salla Stock Import");
+  return wb;
+}
+
+function writeReportXLSX(reports, summary) {
+  const wb = XLSX.utils.book_new();
+
+  // Summary sheet
+  const sumData = [["Metric","Value"], ...Object.entries(summary)];
+  const wsSummary = XLSX.utils.aoa_to_sheet(sumData);
+  wsSummary["!cols"] = [{wch:38},{wch:20}];
+  XLSX.utils.book_append_sheet(wb, wsSummary, "Summary");
+
+  // Report sheets
+  for (const [name, rows] of Object.entries(reports)) {
+    const safeName = name.slice(0, 31);
+    if (!rows.length) {
+      const ws = XLSX.utils.aoa_to_sheet([["No Data"]]);
+      XLSX.utils.book_append_sheet(wb, ws, safeName);
+    } else {
+      const headers = Object.keys(rows[0]);
+      const data = [headers, ...rows.map(r => headers.map(h => r[h]))];
+      const ws = XLSX.utils.aoa_to_sheet(data);
+      XLSX.utils.book_append_sheet(wb, ws, safeName);
+    }
+  }
+  return wb;
+}
+
+function downloadWB(wb, filename) {
+  XLSX.writeFile(wb, filename);
+}
+
+// ==========================================
+// UI Logic
+// ==========================================
+let stockFile = null, sallaFile = null;
+let lastResult = null;
+
+const logBox = document.getElementById("log-box");
+function log(msg, type="info") {
+  const span = document.createElement("span");
+  span.className = `log-${type}`;
+  span.textContent = `> ${msg}`;
+  logBox.appendChild(document.createTextNode("\n"));
+  logBox.appendChild(span);
+  logBox.scrollTop = logBox.scrollHeight;
+}
+
+function setupDropZone(dzId, inpId, onFile) {
+  const dz = document.getElementById(dzId);
+  const inp = document.getElementById(inpId);
+  inp.addEventListener("change", () => { if (inp.files[0]) onFile(inp.files[0], dz); });
+  dz.addEventListener("dragover", e => { e.preventDefault(); dz.classList.add("drag-over"); });
+  dz.addEventListener("dragleave", () => dz.classList.remove("drag-over"));
+  dz.addEventListener("drop", e => {
+    e.preventDefault(); dz.classList.remove("drag-over");
+    const f = e.dataTransfer.files[0];
+    if (f) onFile(f, dz);
+  });
+}
+
+function markFile(dz, file) {
+  dz.classList.add("has-file");
+  dz.querySelector(".dz-label").textContent = `✅ ${file.name}`;
+  dz.querySelector(".dz-icon").textContent = "📄";
+}
+
+setupDropZone("dz-stock", "inp-stock", (f, dz) => {
+  stockFile = f; markFile(dz, f);
+  log(`Stock file: ${f.name}`, "ok");
+  updateGenBtn();
+});
+setupDropZone("dz-salla", "inp-salla", (f, dz) => {
+  sallaFile = f; markFile(dz, f);
+  log(`Salla file: ${f.name}`, "ok");
+  updateGenBtn();
+});
+
+function updateGenBtn() {
+  document.getElementById("btn-generate").disabled = !(stockFile && sallaFile);
+}
+
+document.getElementById("btn-generate").addEventListener("click", async () => {
+  const btn = document.getElementById("btn-generate");
+  btn.disabled = true;
+  logBox.innerHTML = "";
+  showProgress(true);
+
+  try {
+    log("قراءة ملف المخزون...");
+    const stockBuf = await stockFile.arrayBuffer();
+    const stockRows = parseExcel(stockBuf);
+    log(`  → ${stockRows.length} صف`, "ok");
+
+    log("قراءة ملف منتجات سلة...");
+    const sallaBuf = await sallaFile.arrayBuffer();
+    const sallaRows = parseExcel(sallaBuf);
+    log(`  → ${sallaRows.length} صف`, "ok");
+
+    log("التحقق من الأعمدة المطلوبة...");
+    validateColumns(stockRows, STOCK_REQUIRED, "Stock");
+    validateColumns(sallaRows, SALLA_REQUIRED, "Salla");
+    log("  ✓ الأعمدة صحيحة", "ok");
+
+    log("تجميع المخزون بالـ ProductId...");
+    const stockMap = aggregateStock(stockRows);
+    log(`  → ${Object.keys(stockMap).length} ProductId فريد`, "ok");
+
+    log("بناء ملف استيراد سلة...");
+    const result = buildOutput(sallaRows, stockMap);
+    lastResult = result;
+    log(`  → ${result.output.length} منتج في الملف الناتج`, "ok");
+    log("تم بنجاح ✔", "ok");
+
+    showResults(result);
+  } catch (err) {
+    log("خطأ: " + err.message, "err");
+    console.error(err);
+  }
+
+  showProgress(false);
+  btn.disabled = false;
+  document.getElementById("btn-reset").style.display = "";
+});
+
+function showProgress(on) {
+  document.getElementById("prog-wrap").style.display = on ? "flex" : "none";
+}
+
+function showResults(result) {
+  const card = document.getElementById("results-card");
+  card.style.display = "";
+
+  // Stats
+  const grid = document.getElementById("summary-grid");
+  grid.innerHTML = "";
+  for (const [k, v] of Object.entries(result.summary)) {
+    const div = document.createElement("div");
+    div.className = "stat-card";
+    div.innerHTML = `<span class="stat-val">${typeof v === "number" ? v.toLocaleString("ar-SA") : v}</span><div class="stat-lbl">${k}</div>`;
+    grid.appendChild(div);
+  }
+
+  // Tabs
+  const tabsEl = document.getElementById("report-tabs");
+  const panesEl = document.getElementById("report-panes");
+  tabsEl.innerHTML = ""; panesEl.innerHTML = "";
+
+  const tabDefs = [
+    { key: "Not Matched In Stock",   label: "غير متطابقة مع المخزون" },
+    { key: "Stock Not Found In Salla", label: "مخزون غير موجود في سلة" },
+    { key: "Duplicate Salla SKUs",   label: "SKU مكرر في سلة" },
+    { key: "Stock Aggregation",      label: "تجميع المخزون" },
+  ];
+
+  tabDefs.forEach((t, i) => {
+    const rows = result.reports[t.key] || [];
+    const btn = document.createElement("button");
+    btn.className = "tab-btn" + (i === 0 ? " active" : "");
+    btn.textContent = `${t.label} `;
+    const badge = document.createElement("span");
+    badge.className = `badge ${rows.length > 0 && t.key !== "Stock Aggregation" ? "badge-warn" : "badge-ok"}`;
+    badge.textContent = rows.length;
+    btn.appendChild(badge);
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+      document.querySelectorAll(".tab-pane").forEach(p => p.classList.remove("active"));
+      btn.classList.add("active");
+      document.getElementById(`pane-${i}`).classList.add("active");
+    });
+    tabsEl.appendChild(btn);
+
+    const pane = document.createElement("div");
+    pane.className = "tab-pane" + (i === 0 ? " active" : "");
+    pane.id = `pane-${i}`;
+    pane.innerHTML = buildTable(rows);
+    panesEl.appendChild(pane);
+  });
+
+  card.scrollIntoView({ behavior: "smooth" });
+}
+
+function buildTable(rows) {
+  if (!rows.length) return `<div class="empty-state"><span>✅</span>لا توجد بيانات في هذا التقرير</div>`;
+  const headers = Object.keys(rows[0]);
+  let html = `<div class="table-wrap"><table><thead><tr>${headers.map(h=>`<th>${h}</th>`).join("")}</tr></thead><tbody>`;
+  for (const r of rows.slice(0, 500)) {
+    html += `<tr>${headers.map(h=>`<td>${r[h] ?? ""}</td>`).join("")}</tr>`;
+  }
+  if (rows.length > 500) html += `<tr><td colspan="${headers.length}" style="color:var(--muted)">... و${rows.length-500} صف آخر (يظهر كاملاً في الملف المُحمَّل)</td></tr>`;
+  html += `</tbody></table></div>`;
+  return html;
+}
+
+document.getElementById("btn-dl-output").addEventListener("click", () => {
+  if (!lastResult) return;
+  const wb = writeOutputXLSX(lastResult.output);
+  downloadWB(wb, "Salla_Stock_Import_Output.xlsx");
+});
+
+document.getElementById("btn-dl-report").addEventListener("click", () => {
+  if (!lastResult) return;
+  const wb = writeReportXLSX(lastResult.reports, lastResult.summary);
+  downloadWB(wb, "Salla_Stock_Import_Report.xlsx");
+});
+
+document.getElementById("btn-reset").addEventListener("click", () => {
+  stockFile = null; sallaFile = null; lastResult = null;
+  ["dz-stock","dz-salla"].forEach(id => {
+    const dz = document.getElementById(id);
+    dz.classList.remove("has-file","drag-over");
+  });
+  document.getElementById("dz-stock").querySelector(".dz-label").textContent = "اسحب الملف هنا أو انقر للاختيار";
+  document.getElementById("dz-stock").querySelector(".dz-icon").textContent = "📊";
+  document.getElementById("dz-salla").querySelector(".dz-label").textContent = "اسحب الملف هنا أو انقر للاختيار";
+  document.getElementById("dz-salla").querySelector(".dz-icon").textContent = "🏪";
+  document.getElementById("inp-stock").value = "";
+  document.getElementById("inp-salla").value = "";
+  logBox.innerHTML = '<span class="log-info">// جاهز. ارفع الملفين لتبدأ.</span>';
+  document.getElementById("results-card").style.display = "none";
+  document.getElementById("btn-reset").style.display = "none";
+  updateGenBtn();
+});
+</script>
+</body>
+</html>
